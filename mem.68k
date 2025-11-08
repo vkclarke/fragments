@@ -1,0 +1,73 @@
+; clear a section of memory
+; -------------------------
+; PARAMETERS:
+; 	d0.w - size (bytes)
+; 	a0.l - loc
+ClearMemAlt:
+	subq.w  #1,d0
+	; fall through to ClearMem
+
+; PARAMETERS:
+; 	d0.w - size (words) - 1
+; 	a0.l - loc
+ClearMem:
+	moveq   #0,d1
+	exg.l   d0,d1
+	; fall through to FillMem
+
+; fill a section of memory with a byte value
+; ------------------------------------------
+; PARAMETERS:
+; 	d0.b - value
+; 	d1.w - size (bytes) - 1
+; 	a0.l - loc
+FillMem:
+	move.b  d0,(a0)+
+	dbf     d1,FillMem
+	rts
+
+; PARAMETERS:
+; 	d0.b - value
+; 	d1.w - size (bytes)
+; 	a0.l - loc
+FillMemAlt:
+	subq.w  #1,d1
+	bra.s   FillMem
+
+; fill a section of memory with a word value
+; ------------------------------------------
+; PARAMETERS:
+; 	d0.w - value
+; 	d1.w - size (words)
+; 	a0.l - loc
+FillMemWordAlt:
+	subq.w  #1,d1
+	; fall through to FillMemWord
+
+; PARAMETERS:
+; 	d0.w - value
+; 	d1.w - size (words) - 1
+; 	a0.l - loc
+FillMemWord:
+	move.w  d0,(a0)+
+	dbf     d1,FillMemWord
+	rts
+
+; fill a section of memory with a long value
+; ------------------------------------------
+; PARAMETERS:
+; 	d0.l - value
+; 	d1.w - size (longs)
+; 	a0.l - loc
+FillMemLongAlt:
+	subq.w  #1,d1
+	; fall through to FillMemLong
+
+; PARAMETERS:
+; 	d0.l - value
+; 	d1.w - size (longs) - 1
+; 	a0.l - loc
+FillMemLong:
+	move.l  d0,(a0)+
+	dbf     d1,FillMemLong
+	rts

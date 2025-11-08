@@ -1,0 +1,55 @@
+; generic linked-list struct
+; (maybe we'll need it?)
+	rsreset
+lnkNext rs.w 1
+lnkPrev rs.w 1
+
+; data blob
+	rsreset
+dbSize rs.w 1
+dbData rs.b 0
+
+; sprite node
+	rsreset
+sNext rs.w 1
+sPrev rs.w 1
+sMaps rs.l 1
+sEnd  rs.b 0
+
+; object node struct
+	rsreset
+oNext    rs.w 1
+oPrev    rs.w 1
+oRout    rs.w 1
+oTicks   rs.w 1
+oX       rs.l 1
+oY       rs.l 1
+oVelX    rs.w 1
+oVelY    rs.w 1
+oMinX    rs.b 1
+oMinY    rs.b 1
+oMaxX    rs.b 1
+oMaxY    rs.b 1
+oSpr     rs.b sEnd
+oMem     rs.l 1
+oEnd     rs.b 0
+
+; button status struct
+	rsreset
+btnU   rs.b 1
+btnD   rs.b 1
+btnL   rs.b 1
+btnR   rs.b 1
+btnA   rs.b 1
+btnB   rs.b 1
+btnC   rs.b 1
+btnS   rs.b 1
+btnEnd rs.b 0
+
+; sprite piece
+	rsreset
+     rs.b 1
+spSz rs.b 1
+spX  rs.w 1
+spY  rs.w 1
+spT  rs.w 1

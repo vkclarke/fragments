@@ -1,0 +1,19 @@
+binclude macro
+	incbin \1
+	endm
+
+incblob macro
+	dc.w @end\@-@start\@
+@start\@:
+	incbin \1
+@end\@:
+	even
+	endm
+
+; USAGE:
+; 	spiece xsz, ysz, xoff, yoff, tile, xflip, yflip, pal, pri
+spiece macro
+	dc.b 0, (((\1&3)<<2)|(\2&3))&15
+	dc.w \3, \4
+	dc.w \5|(((\6&1)<<11)|((\7&1)<<12)|((\8&3)<<13)|((\9&1)<<15))
+	endm

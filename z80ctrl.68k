@@ -1,0 +1,27 @@
+; z80 interface functions
+; =======================
+
+; Request z80 bus access
+; ----------------------
+RequestZ80Bus:
+	move.w #$100,Z80BUS
+	rts
+
+; Release the z80 bus (start z80)
+; -------------------------------
+StartZ80:
+	sf Z80BUS
+	rts
+
+; Request bus access and wait for z80 to stop
+; -------------------------------------------
+StopZ80:
+	bsr.s RequestZ80Bus
+	; fall through
+
+; Wait for access to z80 bus
+; --------------------------
+WaitZ80Bus:
+	btst #0,Z80BUS
+	bne.s WaitZ80Bus
+	rts

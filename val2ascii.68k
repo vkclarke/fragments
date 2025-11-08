@@ -1,0 +1,35 @@
+Nybble2ASCII:
+	andi.w  #0xF,d0
+	move.b  HexASCIITable(pc,d0.w),d0
+	rts
+
+HexASCIITable:
+	dc.b "0123456789ABCDEF"
+
+Byte2ASCII:
+	move.b  d0,d1
+	bsr.s   Nybble2ASCII
+	move.b  d0,1(a0)
+	lsr.b   #4,d1
+	move.b  d1,d0
+	bsr.s   Nybble2ASCII
+	move.b  d0,(a0)
+	rts
+
+Word2ASCII:
+	move.w  d0,d2
+	lea     2(a0),a0
+	bsr.s   Byte2ASCII
+	lea     -2(a0),a0
+	move.w  d2,-(sp)
+	move.b  (sp)+,d0
+	bra.s   Byte2ASCII
+
+Long2ASCII:
+	move.l  d0,d3
+	lea     4(a0),a0
+	bsr.s   Word2ASCII
+	lea     -4(a0),a0
+	move.l  d3,d0
+	swap    d0
+	bra.s   Word2ASCII

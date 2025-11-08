@@ -1,0 +1,98 @@
+; game variables
+; ==============
+
+	rsset 0xFFFF8000
+
+; misc
+
+SinCosTab rs.w 128
+SinTable  rs.w 64
+CosTable  rs.w 128
+Atan2Tab  rs.b 256
+Log2Tab   rs.b 256
+PalTiles  rs.b 32*16
+
+SoftResets  rs.l 1
+ConsoleType rs.b 1
+MenuEnable  rs.b 1
+
+VBIClock   rs.l 1
+VBIRout    rs.l 1
+HBFirstIns rs.w 1
+HBInt      rs.b 256
+
+P1Buttons rs.b btnEnd ; refer to btn struct
+P2Buttons rs.b btnEnd
+
+BufRAMCursor    rs.l 1
+WorkBufFree     rs.l 1
+
+ValConvBuf rs.l 1 ; temp space for quick hex -> ascii conversions
+RandSeed   rs.l 1
+
+FontBase   rs.w 1
+CursorBase rs.w 1
+IrohaBase  rs.w 1
+
+; 
+
+Pad1Held    rs.b 1
+Pad1Pressed rs.b 1
+Pad2Held    rs.b 1
+Pad2Pressed rs.b 1
+
+; Object state
+
+ObjPool        rs.b oEnd*OBJCOUNT ; obj slot pool
+NextFreeObj    rs.w 1             ; ptr to free slot
+ObjSlotsUsed   rs.w 1             ; used slot counter
+CurObj         rs.w 1
+CurObjList     rs.w 1
+PlayerObj      rs.w 1
+ObjListGeneral rs.w 2
+SpriteLists    rs.w 2*SPRLAYERS
+
+; VDP state
+
+VReg80          rs.w 1
+VReg81          rs.w 1
+VReg82          rs.w 1
+VReg83          rs.w 1
+VReg84          rs.w 1
+VReg85          rs.w 1
+VReg86          rs.w 1
+VReg87          rs.w 1
+VReg88          rs.w 1
+VReg89          rs.w 1
+VReg8A          rs.w 1
+VReg8B          rs.w 1
+VReg8C          rs.w 1
+VReg8D          rs.w 1
+VReg8E          rs.w 1
+VReg8F          rs.w 1
+VReg90          rs.w 1
+VReg91          rs.w 1
+VReg92          rs.w 1
+PlaneRawWidth   rs.w 1
+PlaneRawHeight  rs.w 1
+PlaneCellWidth  rs.w 1
+PlaneCellHeight rs.w 1
+PlaneRowSize    rs.w 1
+PlaneFullSize   rs.w 1
+PlaneRowOffsets rs.w 128
+PlaneALoc       rs.w 1
+PlaneBLoc       rs.w 1
+WindowLoc       rs.w 1
+SprTableLoc     rs.w 1
+HScrollLoc      rs.w 1
+PlaneABuf       rs.b 0x2000 ; 0x2000 is the max size, any dimensions
+PlaneBBuf       rs.b 0x2000
+CRAMBuf         rs.b CRAMSZ
+VSRAMBuf        rs.b VSRAMSZ
+HScrollBuf      rs.b HVRAMSZ
+HWSprBuf        rs.b SVRAMSZ
+SpritesDrawn    rs.w 1
+SpriteBufPtr    rs.w 1
+
+LocalWork rs.b 0
+	inform 0, "global RAM ends at: 0x%h", LocalWork

@@ -1,0 +1,500 @@
+; misc. util library
+; ==================
+
+; stop everything
+; ---------------
+Stop68k:
+	die
+
+; safely reset interrupt pointers
+; (takes no inputs, returns nothing)
+; ----------------------------------
+ResetInts:
+	;move.l  #JMPWCODE<<16|NullInt,VBJmp.w
+	;move.l  #JMPWCODE<<16|NullInt,HBJmp.w
+	rts
+
+; standard V-sync loop
+; --------------------
+VSync:
+	move.l  VBIClock.w,d0
+	andi.w  #%1111101111111111,sr ; remove V-int mask if set
+
+@wait:
+	cmp.l   VBIClock.w,d0
+	beq.s   @wait
+	rts
+
+; Generate palette tiles
+; (needs only to be run once at first boot)
+; -----------------------------------------
+GenPalTiles:
+	lea     PalTiles.w,a0
+	moveq   #0,d0
+	move.l  #0x11111111,d1
+	moveq   #16-1,d2
+
+@loop1:
+	moveq   #(32/4)-1,d3
+
+@loop2:
+	move.l  d0,(a0)+
+	dbf     d3,@loop2
+	add.l   d1,d0
+	dbf     d2,@loop1
+	rts
+
+; DMA palette tiles to start of VRAM
+; ----------------------------------
+DMAPalTiles:
+	move.l  #0x94009300|((0x200/2)&0xFF),4(a6)
+	move.l  #0x96009500|(((PalTiles/2)&0xFF00)<<8)|((PalTiles/2)&0xFF),4(a6)
+	move.w  #0x9700|(((PalTiles)>>17)&0x7F),4(a6)
+	move.l  @addr(pc),4(a6)
+	rts
+
+@addr:
+	dc.l $40000080
+
+; Restore VDP registers to default states
+; ---------------------------------------
+ResetVRegs:
+	lea     DefaultVRegs(pc),a0
+	lea     VReg80.w,a1
+	move.w  #0x8000,d0
+	moveq   #(DefaultVRegs_End-DefaultVRegs)-1,d1
+
+@loop:
+	move.b  (a0)+,d0
+	move.w  d0,(a1)+
+	move.w  d0,4(a6)
+	addi.w  #0x100,d0
+	dbf     d1,@loop
+	rts
+
+DefaultVRegs:
+	dc.b 0|1<<4|1<<2
+	dc.b 0|1<<6|1<<5|1<<4|1<<2
+	dc.b 0x0000>>10
+	dc.b 0x0000>>10
+	dc.b 0x0000>>13
+	dc.b 0x0000>>9
+	dc.b 0
+	dc.b 0
+	dc.b 0 
+	dc.b 0
+	dc.b 0&255
+	dc.b 0|1<<3
+	dc.b 0|1<<7|1<<0
+	dc.b 0|0x0000>>10
+	dc.b 0
+	dc.b 2
+	dc.b 0|1<<0
+	dc.b 0
+	dc.b 0
+DefaultVRegs_End:
+	even
+
+; Switch display on (register $81)
+; --------------------------------
+VDPDispOn:
+	bset.b  #6,VReg81+1.w
+	move.w  VReg81.w,4(a6)
+	rts
+
+; Switch display off (register $81)
+; (fill screen with BG color)
+; ---------------------------------
+VDPDispOff:
+	bclr.b  #6,VReg81+1.w
+	move.w  VReg81.w,4(a6)
+	rts
+
+; Switch to 40-cell (320px wide) mode
+; (this is the mode used in most cases)
+; -------------------------------------
+SetVDP40Cell:
+	ori.b   #%10000001,VReg8C+1.w
+	move.w  VReg8C.w,4(a6)
+	rts
+
+; Switch to 32-cell (256px wide) mode
+; -----------------------------------
+SetVDP32Cell:
+	andi.b  #%01111110,VReg8C+1.w
+	move.w  VReg8C.w,4(a6)
+	rts
+
+; Switch shadow/highlight on (register $8C)
+; -----------------------------------------
+VDPSHOn:
+	bset    #3,VReg8C+1.w
+	move.w  VReg8C.w,4(a6)
+	rts
+
+; Switch shadow/highlight off (register $8C)
+; ------------------------------------------
+VDPSHOff:
+	bclr    #3,VReg8C+1.w
+	move.w  VReg8C.w,4(a6)
+	rts
+
+; Set plane A VRAM location (multiple of $2000)
+; ---------------------------------------------
+; PARAMETERS:
+; 	d0.w - VRAM address
+SetVDPPlaneALoc:
+	push.w  d0 ; $xxxx>>10
+	pop.b   d0
+	lsr.b   #2,d0
+	move.b  d0,VReg82+1.w
+	move.w  VReg82.w,4(a6)
+	rts
+
+; Set plane B VRAM location (multiple of $2000)
+; ---------------------------------------------
+; PARAMETERS:
+; 	d0.w - VRAM address
+SetVDPPlaneBLoc:
+	push.w  d0 ; $xxxx>>13
+	pop.b   d0
+	lsr.b   #5,d0
+	move.b  d0,VReg84+1.w
+	move.w  VReg84.w,4(a6)
+	rts
+
+; Set window plane VRAM location (multiple of $800)
+; -------------------------------------------------
+; PARAMETERS:
+; 	d0.w - VRAM address
+SetVDPWindowLoc:
+	push.w  d0 ; $xxxx>>10
+	pop.b   d0
+	lsr.b   #2,d0
+	move.b  d0,VReg83+1.w
+	move.w  VReg83.w,4(a6)
+	rts
+
+; Set sprite table VRAM location
+; (multiple of $400 in 40-cell mode, $200 in 32-cell mode)
+; --------------------------------------------------------
+; PARAMETERS:
+; 	d0.w - VRAM address
+SetVDPSprTableLoc:
+	push.w  d0 ; $xxxx>>9
+	pop.b   d0
+	lsr.b   #1,d0
+	move.b  d0,VReg85+1.w
+	move.w  VReg85.w,4(a6)
+	rts
+
+; Set H-scroll table VRAM location (multiple of $400)
+; ---------------------------------------------------
+; PARAMETERS:
+; 	d0.w - VRAM address
+SetVDPHScrollLoc:
+	push.w  d0 ; $xxxx>>10
+	pop.b   d0
+	lsr.b   #2,d0
+	move.b  d0,VReg8D+1.w
+	move.w  VReg8D.w,4(a6)
+	rts
+
+; DMA transfer main CRAM buffer
+; -----------------------------
+; no parameters/returns
+DMACRAMStd:
+	move.l  #0x94009300|((0x80/2)&0xFF),4(a6)
+	move.l  #0x96009500|(((CRAMBuf/2)&0xFF00)<<8)|((CRAMBuf/2)&0xFF),4(a6)
+	move.w  #0x9700|(((CRAMBuf)>>17)&0x7F),4(a6)
+	move.l  @addr(pc),4(a6)
+	rts
+
+@addr: dc.l 0xC0000080
+
+; DMA transfer main VSRAM buffer
+; -----------------------------
+; no parameters/returns
+DMAVSRAMStd:
+	move.l  #0x94009300|((0x80/2)&0xFF),4(a6)
+	move.l  #0x96009500|(((VSRAMBuf/2)&0xFF00)<<8)|((VSRAMBuf/2)&0xFF),4(a6)
+	move.w  #0x9700|(((VSRAMBuf)>>17)&0x7F),4(a6)
+	move.l  @addr(pc),4(a6)
+	rts
+
+@addr: dc.l 0x40000090
+
+UpdateVRAMLocs:
+	move.w  PlaneALoc.w,d0
+	jsr     SetVDPPlaneALoc.w
+	move.w  PlaneBLoc.w,d0
+	jsr     SetVDPPlaneBLoc.w
+	move.w  WindowLoc.w,d0
+	jsr     SetVDPWindowLoc.w
+	move.w  SprTableLoc.w,d0
+	jsr     SetVDPSprTableLoc.w
+	move.w  HScrollLoc.w,d0
+	jmp     SetVDPHScrollLoc.w
+
+FlushVRAM:
+	bsr.s   FlushVRAMNoWait
+	bsr.s   WaitDMA
+	move.w  VReg8F.w,4(a6)
+	rts
+
+WaitDMA:
+	move.w  4(a6),ccr
+	bvs.s   WaitDMA
+	rts
+
+FlushVRAMNoWait:
+	move.l  #0x93FF94FF,4(a6)
+	move.l  #0x97808F01,4(a6)
+	move.l  @addr(pc),4(a6)
+	move.w  #0,(a6)
+	rts
+
+@addr: dc.l 0x40000080
+
+; Initialize joypads
+; ------------------
+InitPads:
+	moveq   #0x40,d0
+	move.l  AB_IOCtrl1.w,a0
+	move.b  d0,(a0)+
+	move.w  d0,(a0)+
+	move.w  d0,(a0)+
+	rts
+
+; copy 3-button pad data to RAM
+; -----------------------------
+; PARAMETERS:
+; 	none
+; RETURNS:
+; 	none
+Read3btnPads:
+	jsr     RequestZ80Bus.w
+	lea     Pad1Held.w,a0
+	lea     IODATA1-1,a1
+	moveq   #%00000000,d0
+	moveq   #%01000000,d1
+	rept 2
+		move.w  d0,(a1)
+		moveq   #%00110000,d2
+		moveq   #%00111111,d3
+		and.w   (a1),d2
+		move.w  d1,(a1)
+		add.b   d2,d2
+		add.b   d2,d2
+		and.w   (a1)+,d3
+		or.b    d3,d2
+		not.b   d2
+		move.b  (a0),d3
+		eor.b   d2,d3
+		move.b  d2,(a0)+
+		and.b   d2,d3
+		move.b  d3,(a0)+
+	endr
+	jmp     StartZ80.w
+
+; set BG color index
+; ------------------
+; PARAMETERS:
+; 	d0.b - Color index (00-63)
+; RETURNS:
+; 	none
+SetVDPBGColorIndex:
+	andi.b  #0x3F,d0
+	move.b  d0,VReg87+1.w
+	move.w  VReg87.w,VCTRL
+	rts
+
+; Do immediate DMA to VRAM
+; ------------------------
+; PARAMETERS:
+; 	a0.l - source
+; 	d0.w - size (bytes)
+; 	d1.w - dest (VRAM loc)
+DMAVRAM:
+	lea     4(a6),a1
+	; do size
+	move.l  #0x94009300,d3
+	lsr.w   #1,d0
+	move.b  d0,d3
+	push.w  d0
+	swap    d3
+	pop.b   d3
+	move.l  d3,(a1)
+	; do src
+	move.l  #0x96009500,d3
+	move.l  a0,d2
+	and.l   #0xFFFFFF,d2
+	lsr.l   #1,d2
+	move.b  d2,d3
+	push.w  d2
+	swap    d3
+	pop.b   d3
+	move.l  d3,(a1)
+	swap    d2
+	or.w    #0x9700,d2
+	move.w  d2,(a1)
+	; do dest
+	lsl.l   #2,d1
+	lsr.w   #2,d1
+	add.w   #0x4000,d1
+	move.w  d1,(a1)
+	swap    d1
+	and.w   #3,d1
+	tas.b   d1
+	push.w  d1
+	pop.w   (a1)
+	rts
+
+; this function sucks! fix later
+UpdateButtons:
+	lea     P1Buttons.w,a0
+	move.b  Pad1Held.w,d0
+	move.b  Pad1Pressed.w,d1
+;	bsr     @doPad
+;	rts
+
+@doPad:
+	lea     btnS(a0),a1
+	bsr.s   @doBtn
+	lea     btnA(a0),a1
+	bsr.s   @doBtn
+	lea     btnC(a0),a1
+	bsr.s   @doBtn
+	lea     btnB(a0),a1
+	bsr.s   @doBtn
+	lea     btnR(a0),a1
+	bsr.s   @doBtn
+	lea     btnL(a0),a1
+	bsr.s   @doBtn
+	lea     btnD(a0),a1
+	bsr.s   @doBtn
+	lea     btnU(a0),a1
+	; fall through
+
+@doBtn:
+	add.b   d0,d0
+	scs     (a1)
+	add.b   d1,d1
+	bcs.s   @notHeld
+	neg.b   (a1)
+@notHeld:
+	rts
+
+UpdatePlaneSizes:
+	moveq   #%00110011,d0
+	and.b   VReg90+1.w,d0
+	ror.w   #2,d0
+	add.l   d0,d0
+	add.l   d0,d0
+	lsr.b   #4,d0
+	move.w  d0,d1
+	swap    d0    ; d0 = width, d1 = height
+	move.w  d0,PlaneRawWidth.w
+	move.w  d1,PlaneRawHeight.w
+	moveq   #0,d2
+	moveq   #0,d3
+	move.b  @cellsizes(pc,d0.w),d2
+	move.w  d2,PlaneCellWidth.w
+	move.b  @cellsizes(pc,d1.w),d3
+	move.w  d3,PlaneCellHeight.w
+	add.w   d2,d2
+	move.w  d2,PlaneRowSize.w
+	lsl.b   #3,d1
+	lea     @fullsizes(pc,d1.w),a0
+	add.w   d0,d0
+	move.w  (a0,d0.w),PlaneFullSize.w
+	lea     PlaneRowOffsets.w,a0
+	moveq   #0,d0
+	move.w  PlaneCellHeight.w,d1
+	subq.w  #1,d1
+@buildloop:
+	move.w  d0,(a0)+
+	add.w   d2,d0
+	dbf     d1,@buildloop
+	rts
+
+@cellsizes:
+	dc.b 32, 64, 96, 128
+
+@fullsizes:
+	; nametable size * height * width
+	dc.w  2*32*32,  2*32*64,  2*32*96,  2*32*128
+	dc.w  2*64*32,  2*64*64,  2*64*96,  2*64*128
+	dc.w  2*96*32,  2*96*64,  2*96*96,  2*96*128
+	dc.w 2*128*32, 2*128*64, 2*128*96, 2*128*128
+
+; 	a0 - src
+; 	a1 - dst
+; 	a2 - LUT
+; 	d0 - (columns - 1)
+; 	d1 - (rows - 1)
+CopyMapAlt:
+	push.l  d4
+	move.w  d0,d4
+	move.w  PlaneRowSize.w,d0 ; d0 = current plane width (bytes)
+
+@dorow:
+	lea     (a1),a3
+	move.w  d4,d3
+
+@docell:
+	moveq   #0,d2
+	move.b  (a0)+,d2
+	add.w   d2,d2
+	move.w  (a2,d2.w),(a3)+
+	dbf     d3,@docell
+	lea     (a1,d0.w),a1
+	dbf     d1,@dorow
+	pop.l   d4
+	rts
+
+; draw null-terminated string with LUT method
+; -------------------------------------------
+; 	a0 - src
+; 	a1 - dst
+; 	a2 - LUT
+DrawString:
+	moveq   #0,d0
+	move.b  (a0)+,d0
+	beq.s   @done
+	add.w   d0,d0
+	move.w  (a2,d0.w),(a1)+
+	bra.s   DrawString
+@done:
+	rts
+
+; Copy null-terminated char sequence
+; ----------------------------------
+; PARAMETERS:
+; 	a0 - src
+; 	a1 - dst
+CopyString:
+	bra.s   @start
+
+@loop:
+	move.b  d0,(a1)+
+
+@start:
+	move.b  (a0)+,d0
+	bne.s   @loop
+	rts
+
+; Copy null-terminated char sequence (including null char)
+; --------------------------------------------------------
+; PARAMETERS:
+; 	a0 - src
+; 	a1 - dst
+CopyStringFull:
+@loop:
+	move.b  (a0)+,(a1)+
+	bne.s   @loop
+	rts
+
+ResetBufRAMCursor:
+	move.l  AB_WorkRAM.w,BufRAMCursor.w
+	rts

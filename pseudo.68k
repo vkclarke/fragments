@@ -1,0 +1,38 @@
+; pseudo-opcode macros
+; ====================
+
+push macro
+	move.\0 \1,-(sp)
+ endm
+
+pop macro
+	move.\0 (sp)+,\1
+ endm
+
+pushm macro
+	movem.\0 \1,-(sp)
+ endm
+
+popm macro
+	movem.\0 (sp)+,\1
+ endm
+
+die macro
+	stop #$2700
+ endm
+
+abs macro
+	tst.\0 \1
+	bpl.s @jmp\@
+	neg.\0 \1
+@jmp\@:
+ endm
+
+les macro
+	lea @s\@(pc),\2
+	bra.s @jmp\@
+@s\@:
+	dc.b \1,0
+	even
+@jmp\@:
+ endm

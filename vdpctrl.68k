@@ -1,0 +1,64 @@
+; VDP interface functions
+; =======================
+
+; generate VRAM write command for address
+; ---------------------------------------
+; PARAMETERS:
+; 	d0.w - address
+; RETURNS:
+; 	d0.l - command
+VRAMLocToCmd:
+	lsl.l   #2,d0
+	lsr.w   #2,d0
+	or.w    #0x4000,d0
+	swap    d0
+	and.w   #3,d0
+	rts
+
+; generate DMA write command for VRAM address
+; -------------------------------------------
+; PARAMETERS:
+; 	d0.w - address
+; RETURNS:
+; 	d0.l - command
+VRAMLocToDMACmd:
+	bsr.s   VRAMLocToCmd
+	tas.b   d0
+	rts
+
+; set VDP to write to VRAM address
+; --------------------------------
+; PARAMETERS:
+; 	d0.w - address
+SetVRAMWrite:
+	bsr.s   VRAMLocToCmd
+	move.l  d0,4(a6)
+	rts
+
+; set VDP to write to VSRAM address
+; ---------------------------------
+; PARAMETERS:
+; 	d0.b - address
+SetVSRAMWrite:
+	move.l  #0x0010407F,d1
+	and.b   d0,d1
+	swap    d1
+	move.l  d1,4(a6)
+	rts
+
+; set VDP to write to CRAM address
+; --------------------------------
+; PARAMETERS:
+; 	d0.b - address ($0-$7F)
+SetCRAMWrite:
+	move.l  #0xC07F,d1
+	and.b   d0,d1
+	swap    d1
+	move.l  d1,4(a6)
+	rts
+
+; quickly set VDP to write to CRAM address $0
+; -------------------------------------------
+SetCRAMWrite2:
+	move.l  #0xC0000000,4(a6)
+	rts

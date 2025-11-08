@@ -1,0 +1,81 @@
+; Remap tile data's color index values
+; ------------------------------------
+; PARAMETERS:
+; 	d0.w - number of tiles - 1
+; 	a0.l - pointer to src
+; 	a1.l - pointer to dest
+; 	a2.l - pointer to color LUT
+; NOTES:
+; 	LUT works as follows:
+; 		dc.b 0
+; 		dc.b 2
+; 		dc.b 1
+; 		etc...
+; 	each byte represents the replacement color index
+; 	value for the color index of its offset. the high
+; 	nybble of each byte ($F0) will be ignored.
+; 	any values present past offset $F will be ignored.
+; 
+; 	if you wish to modify tile data loaded into RAM
+; 	instead of copying, use the same pointer for src
+; 	and dest.
+RemapTileColors:
+	move.l  d4,a3
+	move.b  #$F0,d4
+@loop0:
+	rept 8
+		move.l  (a0)+,d1
+		rept 8
+			moveq   #$F,d2
+			move.b  d1,d3
+			and.w   d2,d3
+			and.b   (a2,d3.w),d2
+			and.b   d4,d1
+			or.b    d2,d1
+			ror.l   #4,d1
+		endr
+		move.l  d1,(a1)+
+	endr
+	dbf     d0,@loop0
+	move.l  a3,d4
+	rts
+
+; Expand 1bpp (single-color) tile data to 4bpp (16-color)
+; -------------------------------------------------------
+; PARAMETERS:
+; 	a0.l - pointer to data
+; 	a1.l - pointer to destination
+; 	d0.w - compressed size (bytes) - 1
+; 	d1.b - color index to use (0 to 15)
+Decompress1bpp:
+	move.l  d4,a2
+	andi.b  #$F,d1
+@doRow:
+	move.b  (a0)+,d2
+	rept 4
+		add.b   d2,d2
+		scs     d3
+		and.b   d1,d3
+		lsl.b   #4,d3
+		add.b   d2,d2
+		scs     d4
+		and.b   d1,d4
+		or.b    d4,d3
+		move.b  d3,(a1)+
+	endr
+	dbf     d0,@doRow
+	move.l  a2,d4
+	rts
+
+; copy 4bpp tile data
+; -------------------
+; PARAMETERS:
+; 	a0.l - src
+; 	a1.l - dst
+; 	d0.w - number of tiles-1
+CopyTiles:
+	rept 8
+		move.l  (a0)+,(a1)+
+	endr
+	dbf     d0,CopyTiles
+	rts
