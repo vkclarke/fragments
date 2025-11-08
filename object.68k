@@ -1,0 +1,300 @@
+; General object management functions
+; ===================================
+
+; Initialize object slot pool
+; ---------------------------
+InitObjPool:
+	lea     ObjPool.w,a0
+	moveq   #0,d0
+	moveq   #OBJCOUNT-1,d1
+
+@loop:
+	move.w  d0,oNext(a0)
+	move.w  a0,d0
+	lea     OBJSZ(a0),a0
+	dbf     d1,@loop
+	move.w  d0,NextFreeObj.w
+	rts
+
+; Append a new object to the current list
+; ---------------------------------------
+; PARAMETERS:
+; 	a0 - Object info struct
+AddObj:
+	move.w  CurObjList.w,a1
+	; fall through to AddObjToList...
+
+; Append a new object to a specified list
+; ---------------------------------------
+; PARAMETERS:
+; 	a0   - Object info struct
+; 	a1.w - Pointer to list head
+AddObjToList:
+	move.w  NextFreeObj.w,d0
+	beq.s   @return
+	move.w  d0,a2
+	move.w  oNext(a2),NextFreeObj.w
+	move.w  a1,oNext(a2)            ; last object points to list head
+	move.w  oPrev(a1),a3
+	move.w  a3,oPrev(a2)
+	move.w  a2,oNext(a3)
+	move.w  a2,oPrev(a1)
+	addq.w  #1,ObjSlotsUsed.w       ; increment used object count
+
+@return:
+	rts
+
+; Remove current object from its list
+; -----------------------------------
+RemoveCurObj:
+	lea     (a5),a0
+	; fall through
+
+; Remove object from its list
+; ---------------------------
+; PARAMETERS:
+; 	a0.w - object
+RemoveObj:
+	movem.w oNext(a0),a1-a2
+	move.w  a1,oNext(a2)            ; hook next slot into previous...
+	move.w  a2,oPrev(a1)            ; ...and previous into next
+	move.w  NextFreeObj.w,oNext(a0)
+	move.w  a0,NextFreeObj.w
+	subq.w  #1,ObjSlotsUsed.w       ; decrement used object count
+	rts
+
+; Add object's velocity to position
+; (move forwards a step)
+; ---------------------------------
+MoveCurObj:
+	lea     (a5),a0
+	; fall through
+MoveObj:
+	movem.w oVelX(a0),d0-d1
+	lsl.l   #8,d0
+	add.l   d0,oX(a0)
+	lsl.l   #8,d1
+	add.l   d1,oY(a0)
+	rts
+
+; Subtract object's velocity from position
+; (move backwards a step)
+; ----------------------------------------
+UnmoveCurObj:
+	lea     (a5),a0
+	; fall through
+UnmoveObj:
+	movem.w oVelX(a0),d0-d1
+	lsl.l   #8,d0
+	sub.l   d0,oX(a0)
+	lsl.l   #8,d1
+	sub.l   d1,oY(a0)
+	rts
+
+; Suspend object runtime and return to caller
+; -------------------------------------------
+; PARAMETERS:
+; 	a5 - current object
+; USAGE:
+; 	jsr     BookmarkObj.w
+; 	(jmp CANNOT be used!)
+BookmarkObj:
+	addq.w  #2,sp
+	move.w  (sp)+,oRout(a5)
+	rts
+
+; PARAMETERS:
+; 	none
+; RETURNS:
+; 	none
+InitSpriteLists:
+	lea     SpriteLists.w,a0
+	moveq   #0,d0
+	moveq   #0,d1
+
+@loop:
+	cmpi.w  #SPRLAYERS-1,d0
+	beq.s   @done
+	move.w  d1,d2
+	addq.w  #4,d1
+	move.w  d1,(a0)+
+	move.w  d2,(a0)+
+	addq.b  #1,d0
+	bra.s   @loop
+
+@done:
+	clr.w   (a0)+
+	move.w  d1,(a0)+
+	rts
+
+AddSprite:
+	rts
+
+RenderObjects:
+	movem.l d4-d7/a4-a6,-(sp)
+	lea     SpriteLists.w,a5
+
+
+	move.w  SpriteBufPtr.w,a1
+
+@return:
+	movem.l (sp)+,d4-d7/a4-a6
+	rts
+
+; Convert a mappings set to sprite pieces
+; ---------------------------------------
+; PARAMETERS:
+; 	d0.w - current number of sprite pieces drawn
+; 	d1.w - number of pieces in this mappings set
+; 	d4.w - VDP flags
+; 	d5.w - tile ID
+; 	d6.w - x pos
+; 	d7.w - y pos
+; 	a0.l - ptr to mappings
+; 	a1.l - ptr to current position in sprite buffer
+; 
+; NOTES:
+; 	Sprite piece layout is as follows:
+; 		dc.b 0
+; 		dc.b SZ
+; 		dc.w YPOS
+; 		dc.w XPOS
+; 		dc.w TILE
+; 
+; 	this gets messy, so pay close attention
+DrawSprMaps:
+	move.w  d4,d2
+	andi.w  #%0001100000000000,d2
+	bne.s   @flip
+
+@noflip:
+	addq.w  #1,d0
+	movem.l (a0)+,d2-d3
+	; first half
+	add.w   d7,d2       ; d7 = y pos
+	swap    d2
+	move.b  d2,-(sp)
+	move.w  (sp)+,d2
+	move.b  d0,d2       ; d0 = piece count
+	move.l  d2,(a1)+
+	; second half
+	add.w   d5,d3       ; d5 = tile ID
+	or.w    d4,d3       ; d4 = VDP flags
+	swap    d3
+	add.w   d6,d3       ; d6 = x pos
+	move.l  d3,(a1)+
+	; continue?
+	cmpi.b  #80,d0
+	dbeq    d1,@noflip
+	rts
+
+; u8 hsizes[4][4]
+@hsizes:
+	dc.b 8,  8,  8,  8
+	dc.b 16, 16, 16, 16
+	dc.b 24, 24, 24, 24
+	dc.b 32, 32, 32, 32
+
+@flip:
+	eor.w   d2,d4
+	lea     @hsizes(pc),a2
+	lsl.w   #3,d2
+	bmi.s   @yflip
+
+@xflip:
+	addq.w  #1,d0
+	; first half
+	move.l  (a0)+,d2
+	add.w   d7,d2
+	swap    d2
+	moveq   #0,d3
+	move.b  (a2,d2.w),d3 ; a2 = h sizes
+	move.b  d2,-(sp)
+	move.w  (sp)+,d2
+	move.b  d0,d2
+	move.l  d2,(a1)+
+	; second half
+	move.l  (a0)+,d2
+	add.w   d5,d2
+	or.w    d4,d2
+	eori.w  #%00001000<<8,d2
+	swap    d2
+	neg.w   d2
+	sub.w   d3,d2
+	add.w   d6,d2
+	move.l  d2,(a1)+
+	; continue?
+	cmpi.b  #80,d0
+	dbeq    d1,@xflip
+	rts
+
+; u8 vsizes[4][4]
+@vsizes:
+	dc.b 8, 16, 24, 32
+	dc.b 8, 16, 24, 32
+	dc.b 8, 16, 24, 32
+	dc.b 8, 16, 24, 32
+
+@yflip:
+	lea     @vsizes(pc),a3
+	add.w   d2,d2
+	bmi.s   @xyflip
+
+@yflip_loop:
+	addq.w  #1,d0
+	; first half
+	move.l  (a0)+,d2
+	neg.w   d2
+	add.w   d7,d2
+	swap    d2
+	moveq   #0,d3
+	move.b  (a3,d2.w),d3
+	swap    d3
+	sub.l   d3,d2
+	move.b  d2,-(sp)
+	move.w  (sp)+,d2
+	move.b  d0,d2
+	move.l  d2,(a1)+
+	; second half
+	move.l  (a0)+,d2
+	add.w   d5,d2
+	or.w    d4,d2
+	eori.w  #%00010000<<8,d2
+	swap    d2
+	add.w   d6,d2
+	move.l  d2,(a1)+
+	; continue?
+	cmpi.b  #80,d0
+	dbeq    d1,@yflip_loop
+	rts
+
+@xyflip:
+	addq.w  #1,d0
+	; first half
+	move.l  (a0)+,d2
+	neg.w   d2
+	add.w   d7,d2
+	swap    d2
+	moveq   #0,d3
+	move.b  (a3,d2.w),d3
+	swap    d3
+	sub.l   d3,d2
+	move.b  (a2,d2.w),d3
+	move.b  d2,-(sp)
+	move.w  (sp)+,d2
+	move.b  d0,d2
+	move.l  d2,(a1)+
+	; second half
+	move.l  (a0)+,d2
+	add.w   d5,d2
+	or.w    d4,d2
+	eori.w  #%00011000<<8,d2
+	swap    d2
+	neg.w   d2
+	sub.w   d3,d2
+	add.w   d6,d2
+	move.l  d2,(a1)+
+	; continue?
+	cmpi.b  #80,d0
+	dbeq    d1,@xyflip
+	rts
